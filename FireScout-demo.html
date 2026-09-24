@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>FireScout — мониторинг пожаров</title>
+<style>
+:root{color-scheme:dark;--bg:#101713;--panel:#19231d;--line:#324237;--text:#eff3e9;--muted:#a4b2a5;--green:#c0ef8a;--red:#ff977c}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:32px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:36px}.logo{font-size:25px;letter-spacing:-1px;font-weight:750}.logo span{color:var(--green)}.badge{border:1px solid var(--line);border-radius:30px;padding:7px 12px;font-size:12px;color:var(--green)}h1{font-size:clamp(30px,5vw,48px);line-height:1.1;letter-spacing:-1.8px;margin:8px 0 15px}h2{font-size:17px;margin:0 0 14px}p{color:var(--muted);margin:8px 0 22px}.eyebrow{font-size:11px;letter-spacing:2px;color:var(--green)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}button,select{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:10px;padding:11px 15px;cursor:pointer}button:hover{border-color:var(--green)}button:focus-visible,select:focus-visible{outline:2px solid var(--green);outline-offset:3px}button.primary{background:var(--green);color:#15200e;border-color:var(--green);font-weight:650}.status{border:1px solid var(--line);background:#203024;border-radius:16px;padding:18px 22px;margin:20px 0}.status[data-state=alarm]{background:#46261f;border-color:var(--red)}.status[data-state=suspect],.status[data-state=fault],.status[data-state=stale]{background:#37301e;border-color:#8f793b}.status strong{display:block;font-size:19px}.status small{color:var(--muted)}.grid{display:grid;grid-template-columns:1.15fr 1fr;gap:18px}.panel{border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:22px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{background:#111b15;border-radius:12px;padding:16px}.label{color:var(--muted);font-size:12px}.value{font-size:28px;font-weight:600;letter-spacing:-1px;margin:5px 0}.unit{font-size:13px;color:var(--muted);font-weight:400;letter-spacing:0}.note{font-size:12px;color:var(--muted)}svg{display:block;width:100%;height:230px;background:#111b15;border-radius:12px}.row{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:12px;color:var(--muted)}.history{margin-top:18px}.event{padding:13px 0;border-bottom:1px solid var(--line)}.event:last-child{border:0}.event b{color:var(--red)}.event small{display:block;color:var(--muted)}footer{font-size:12px;color:var(--muted);margin:24px 0}#message{color:var(--green);min-height:24px}dialog{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:16px;max-width:420px;width:90%}dialog::backdrop{background:#000a}#devices button{display:block;width:100%;margin:8px 0;text-align:left}@media(max-width:700px){main{padding:20px 16px}.grid{grid-template-columns:1fr}header{margin-bottom:26px}.panel{padding:16px}.toolbar>*{flex:1}h1{letter-spacing:-1px}.badge{font-size:10px}.value{font-size:25px}}
+</style></head><body><main>
+<header><div class="logo">✳ Fire<span>Scout</span></div><div class="badge" id="mode">СИМУЛЯТОР · ОФЛАЙН</div></header>
+<div class="eyebrow">ВОЗДУШНОЕ НАБЛЮДЕНИЕ / 01</div><h1>Замечать раньше.</h1><p>Учебный пульт обнаружения пожаров. Проверь сценарии без дрона и датчиков.</p>
+<div class="toolbar"><button class="primary" id="start">Начать симуляцию</button><select aria-label="Сценарий симуляции" id="scenario"><option value="normal">Обычный полёт</option><option value="fire">Признаки пожара</option><option value="false">Одиночный сигнал</option><option value="loss">Потеря связи</option></select><button id="ble">Подключить BLE</button><button id="notify">Включить уведомления</button></div>
+<div id="message" role="status"></div><section class="status" id="status" data-state="idle" aria-live="polite"><strong id="stateTitle">Готов к демонстрации</strong><small id="stateText">Нажми «Начать симуляцию». Все показания будут искусственными.</small></section>
+<div class="grid"><section class="panel"><h2>Датчики на борту</h2><div class="metrics"><div class="metric"><div class="label">GY-906 · температура объекта</div><div class="value"><span id="temp">—</span> <span class="unit">°C</span></div></div><div class="metric"><div class="label">MQ-2 · сырой сигнал</div><div class="value"><span id="smoke">—</span> <span class="unit">ADC / 4095</span></div></div><div class="metric"><div class="label">KY-026 · признак пламени</div><div class="value" id="flame">—</div></div><div class="metric"><div class="label">Высота над точкой старта</div><div class="value"><span id="altitude">—</span> <span class="unit">м</span></div></div></div><div class="row"><span id="battery">Заряд: —</span><span id="age">Пакетов ещё нет</span></div><p class="note" style="margin-bottom:0">ESP32-CAM: <span id="camera">видеопоток не подключён</span>. Распознавание по изображению в этой версии отсутствует.</p></section>
+<section class="panel"><h2>Положение дрона</h2><svg viewBox="0 0 400 230" role="img" aria-label="Локальная схема положения дрона относительно старта"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#263a2c"/></pattern></defs><rect width="400" height="230" fill="url(#grid)"/><circle cx="200" cy="115" r="80" fill="none" stroke="#40543c" stroke-dasharray="4 5"/><path d="M200 25V205 M100 115H300" stroke="#40543c"/><text x="210" y="108" fill="#a4b2a5" font-size="11">СТАРТ</text><text x="20" y="24" fill="#a4b2a5" font-size="11">С ↑</text><text x="280" y="210" fill="#a4b2a5" font-size="10" id="scale">КРУГ: 10 М</text><circle cx="200" cy="115" r="4" fill="#a4b2a5"/><g id="drone" visibility="hidden"><circle r="15" fill="#c0ef8a" opacity=".14"/><path d="M0 -9L7 8L0 4L-7 8Z" fill="#c0ef8a"/></g></svg><div class="row"><span id="coords">GPS: —</span><span id="distance">От старта: —</span></div><p class="note" style="margin-bottom:0">Локальная схема без интернет-карты. Координаты относятся к дрону, а не к очагу.</p></section></div>
+<section class="panel history"><h2>Журнал обнаружений <span class="note">· последние 100 событий</span></h2><div id="events"><p class="note">Событий пока нет.</p></div><button id="clear">Очистить журнал</button></section>
+<footer>Прототип 0.1 · Сценарий: высота 5 м, удаление до 10 м · Мониторинг только при открытом приложении. Пороги учебные, дальность BLE не проверена.</footer>
+<dialog id="deviceDialog"><h2>Устройства FireScout</h2><p class="note">Поиск устройств с сервисом протокола FireScout, до 10 секунд.</p><div id="devices"></div><button id="closeDialog">Закрыть</button></dialog>
+</main><script>(function (root) {
+  'use strict';
+  // Protocol v1: fixed 20-byte, little-endian BLE notification, no MTU negotiation.
+  function decode(bytes) {
+    if (!(bytes instanceof Uint8Array) || bytes.length !== 20) throw Error('Ожидается пакет из 20 байт');
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (v.getUint8(0) !== 1) throw Error('Неизвестная версия протокола');
+    const flags = v.getUint8(1);
+    if (flags & 0xf0) throw Error('Некорректные флаги');
+    const t = {seq:v.getUint16(2,true), temp:v.getInt16(4,true)/100,
+      smoke:v.getUint16(6,true), lat:v.getInt32(8,true)/1e7,
+      lon:v.getInt32(12,true)/1e7, altitude:v.getInt16(16,true)/10,
+      battery:v.getUint8(18), flame:!!(flags&1), gps:!!(flags&2),
+      sensors:!!(flags&4), camera:!!(flags&8)};
+    if (t.temp < -70 || t.temp > 380 || t.smoke>4095 || t.battery>100 ||
+        (t.gps && (Math.abs(t.lat)>90 || Math.abs(t.lon)>180)) || v.getUint8(19)!==0)
+      throw Error('Показания вне диапазона');
+    return t;
+  }
+  class Detector {
+    constructor(){ this.reset(); }
+    reset(){ this.last=null; this.seq=null; this.hot=0; this.cool=0; this.active=false; }
+    accept(t, now) {
+      if(this.seq !== null) {
+        const delta=(t.seq-this.seq+65536)%65536;
+        if(delta===0 || delta>32767) return {ignored:true};
+      }
+      if(this.last!==null && now-this.last>5000) {this.hot=0; this.cool=0;}
+      this.seq=t.seq; this.last=now;
+      if(!t.sensors){this.hot=0;this.cool=0;return {state:'fault',alarm:false,active:this.active};}
+      // Educational thresholds only; raw MQ-2 ADC is NOT ppm.
+      const votes=Number(t.temp>=60)+Number(t.smoke>=1800)+Number(t.flame);
+      this.hot=votes>=2?this.hot+1:0;
+      this.cool=votes===0?this.cool+1:0;
+      const alarm=!this.active && this.hot>=3;
+      if(alarm)this.active=true;
+      if(this.cool>=5)this.active=false;
+      return {state:this.active?'alarm':votes?'suspect':'normal',alarm,active:this.active};
+    }
+    stale(now){return this.last===null || now-this.last>5000;}
+  }
+  const api={decode,Detector};
+  if(typeof module!=='undefined' && module.exports)module.exports=api;
+  else root.FireCore=api;
+})(typeof globalThis!=='undefined'?globalThis:this);
+</script><script>'use strict';
+const $=id=>document.getElementById(id), detector=new FireCore.Detector();
+let running=false, source='sim', seq=0, ticks=0, origin=null, latest=null, staleShown=false;
+let events=[];
+try { const saved=JSON.parse(localStorage.getItem('firescout.events')||'[]'); if(Array.isArray(saved))events=saved.filter(e=>e&&typeof e.time==='string'&&typeof e.where==='string'&&typeof e.source==='string').slice(0,100); } catch(_){}
+function message(text){$('message').textContent=text;}
+function status(state,title,text){$('status').dataset.state=state;$('stateTitle').textContent=title;$('stateText').textContent=text;}
+function renderEvents(){
+  $('events').replaceChildren();
+  if(!events.length){const p=document.createElement('p');p.className='note';p.textContent='Событий пока нет.';$('events').append(p);}
+  events.forEach(e=>{const row=document.createElement('div');row.className='event';const b=document.createElement('b');b.textContent='Возможный пожар';const small=document.createElement('small');small.textContent=`${e.time} · ${e.source} · ${e.where}`;row.append(b,small);$('events').append(row);});
+}
+function save(){try{localStorage.setItem('firescout.events',JSON.stringify(events));}catch(_){message('Журнал доступен только до закрытия: сохранение недоступно.');}}
+function clearReadings(){['temp','smoke','flame','altitude'].forEach(id=>$(id).textContent='—');$('coords').textContent='GPS: —';$('distance').textContent='От старта: —';$('battery').textContent='Заряд: —';$('drone').setAttribute('visibility','hidden');$('age').textContent='Пакетов ещё нет';}
+function reset(){detector.reset();origin=null;latest=null;staleShown=false;clearReadings();}
+function receive(t){
+  const result=detector.accept(t,Date.now());if(result.ignored)return;
+  latest=t;staleShown=false;
+  $('temp').textContent=t.sensors?t.temp.toFixed(1):'—';$('smoke').textContent=t.sensors?t.smoke:'—';$('flame').textContent=t.sensors?(t.flame?'Есть':'Нет'):'—';$('altitude').textContent=t.altitude.toFixed(1);$('battery').textContent=`Заряд: ${t.battery}%`;
+  $('camera').textContent=t.camera?'модуль заявлен, видео не передаётся':'видеопоток не подключён';
+  if(t.gps){
+    if(!origin)origin={lat:t.lat,lon:t.lon};
+    const north=(t.lat-origin.lat)*111320,east=(t.lon-origin.lon)*111320*Math.cos(origin.lat*Math.PI/180), distance=Math.hypot(north,east), radius=Math.max(10,Math.ceil(distance/10)*10);
+    $('drone').setAttribute('visibility','visible');$('drone').setAttribute('transform',`translate(${200+east*80/radius} ${115-north*80/radius})`);
+    $('scale').textContent=`КРУГ: ${radius} М`;$('coords').textContent=`${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}`;$('distance').textContent=`От старта: ${distance.toFixed(1)} м`;
+  }else{$('coords').textContent='GPS: нет фиксации';$('distance').textContent='От старта: —';$('drone').setAttribute('visibility','hidden');}
+  const names={normal:'Признаков пожара нет',suspect:'Есть подозрительный сигнал',alarm:'Возможный пожар',fault:'Датчики не готовы'};
+  const details={normal:'Текущие показания ниже учебных порогов.',suspect:'Ожидаем подтверждение в следующих пакетах.',alarm:'Тревога сохраняется до пяти спокойных пакетов подряд.',fault:'Оценка пожара недоступна. Проверь состояние датчиков.'};
+  status(result.state,names[result.state],details[result.state]+(result.state==='fault'&&result.active?' Предыдущая тревога не снята.':'')+(source==='sim'?' Это симуляция.':''));
+  if(result.alarm){
+    const where=t.gps?`GPS дрона: ${t.lat.toFixed(6)}, ${t.lon.toFixed(6)}`:'GPS недоступен';
+    events.unshift({time:new Date().toLocaleString('ru-RU'),source:source==='sim'?'СИМУЛЯЦИЯ':'BLE',where});events=events.slice(0,100);save();renderEvents();
+    const body=(source==='sim'?'СИМУЛЯЦИЯ. ':'')+where;
+    if(window.Android)Android.alert(body);else if('Notification'in window&&Notification.permission==='granted')new Notification('FireScout: возможный пожар',{body});
+  }
+}
+function tick(){
+  if(!running||source!=='sim')return;
+  if($('scenario').value==='loss')return;
+  ticks++;const fire=$('scenario').value==='fire',single=$('scenario').value==='false';
+  const angle=ticks/12, r=ticks===1?0:4;
+  receive({seq:seq++%65536,temp:fire?78+Math.sin(ticks)*3:25+Math.sin(ticks)*1.5,smoke:fire?2400+Math.round(Math.sin(ticks)*60):350+Math.round(Math.cos(ticks)*30),flame:fire||single,lat:43.238949+r*Math.cos(angle)/111320,lon:76.889709+r*Math.sin(angle)/(111320*Math.cos(43.238949*Math.PI/180)),altitude:5,battery:92,gps:true,sensors:true,camera:false});
+}
+$('start').onclick=()=>{
+  if(source==='sim'&&running){running=false;status('idle','Симуляция остановлена','Показания не обновляются.');$('start').textContent='Начать симуляцию';clearReadings();return;}
+  if(window.Android)Android.disconnect();source='sim';running=true;ticks=0;reset();$('scenario').disabled=false;$('mode').textContent='СИМУЛЯТОР · ОФЛАЙН';$('start').textContent='Остановить';message('Искусственные данные, один пакет в секунду.');tick();
+};
+$('scenario').onchange=()=>{if(running&&source==='sim')message('Сценарий изменён. Наблюдай за показаниями и статусом.');};
+$('clear').onclick=()=>{events=[];save();renderEvents();};
+$('notify').onclick=async()=>{if(window.Android){Android.enableNotifications();return;}if(!('Notification'in window)){message('Системные уведомления доступны в Android-приложении.');return;}try{const p=await Notification.requestPermission();message(p==='granted'?'Уведомления включены.':'Уведомления не разрешены. События останутся в журнале.');}catch(_){message('Браузер не разрешает уведомления для локального файла. Используй Android-приложение.');}};
+$('ble').onclick=()=>{if(!window.Android){message('BLE доступен в Android-приложении. Здесь можно проверить симуляцию.');return;}running=false;source='ble';reset();$('scenario').disabled=true;$('mode').textContent='BLUETOOTH LE';$('start').textContent='Начать симуляцию';$('devices').replaceChildren();$('deviceDialog').showModal();status('idle','Поиск устройства','Ожидаем подключение и первый пакет.');Android.scan();};
+$('closeDialog').onclick=()=>{$('deviceDialog').close();if(window.Android)Android.stopScan();};
+window.nativeDevice=(address,name)=>{if(document.getElementById(address))return;const b=document.createElement('button');b.id=address;b.textContent=`${name||'FireScout'} · ${address}`;b.onclick=()=>{$('deviceDialog').close();Android.connect(address);};$('devices').append(b);};
+window.nativeStatus=text=>message(text);
+window.nativeDisconnected=()=>{if(source==='ble'){reset();status('stale','Связь потеряна','Новых показаний нет. Подключись к устройству повторно.');}};
+window.nativePacket=values=>{if(source!=='ble')return;try{receive(FireCore.decode(Uint8Array.from(values)));}catch(e){message('Ошибка пакета: '+e.message);}};
+window.nativePaused=()=>{running=false;reset();$('start').textContent='Начать симуляцию';status('idle','Мониторинг приостановлен','Приложение было свёрнуто. Запусти симуляцию или подключись заново.');};
+setInterval(()=>{tick();if(detector.last!==null&&((source==='sim'&&running)||source==='ble')){$('age').textContent=`Пакет: ${Math.floor((Date.now()-detector.last)/1000)} с назад`;if(detector.stale(Date.now())&&!staleShown){staleShown=true;clearReadings();status('stale','Нет свежих данных',detector.active?'Связь потеряна. Предыдущая тревога не снята.':'Более 5 секунд без пакетов. Оценка пожара недоступна.');}}else if(running&&$('scenario').value==='loss')status('stale','Нет связи','Сценарий потери связи: данные не поступают.');},1000);
+renderEvents();
+
+</script></body></html>
